@@ -4,12 +4,129 @@ def period(sma_au,mass):
         Written by Logan Pearce, 2019
     """
     import numpy as np
-    return np.sqrt(((sma_au)**3)/mass).value*u.yr
+    import astropy.units as u
+    # If astropy units are given, return astropy unit object
+    try:
+        period = np.sqrt(((sma_au)**3)/mass).value*(u.yr)
+    # else return just a value.
+    except:
+        period = np.sqrt(((sma_au)**3)/mass)
+    return period
+
+def distance(parallax,parallax_error):
+    '''Computes distance from Gaia parallaxes using the Bayesian method of Bailer-Jones 2015.
+    Input: parallax [mas], parallax error [mas]
+    Output: distance [pc], 1-sigma uncertainty in distance [pc]
+    '''
+    import numpy as np
+    # Compute most probable distance:
+    L=1350 #parsecs
+    # Convert to arcsec:
+    parallax, parallax_error = parallax/1000., parallax_error/1000.
+    # establish the coefficients of the mode-finding polynomial:
+    coeff = np.array([(1./L),(-2),((parallax)/((parallax_error)**2)),-(1./((parallax_error)**2))])
+    # use numpy to find the roots:
+    g = np.roots(coeff)
+    # Find the number of real roots:
+    reals = np.isreal(g)
+    realsum = np.sum(reals)
+    # If there is one real root, that root is the  mode:
+    if realsum == 1:
+        gd = np.real(g[np.where(reals)[0]])
+    # If all roots are real:
+    elif realsum == 3:
+        if parallax >= 0:
+            # Take the smallest root:
+            gd = np.min(g)
+        elif parallax < 0:
+            # Take the positive root (there should be only one):
+            gd = g[np.where(g>0)[0]]
+    
+    # Compute error on distance from FWHM of probability distribution:
+    from scipy.optimize import brentq
+    rmax = 1e6
+    rmode = gd[0]
+    M = (rmode**2*np.exp(-rmode/L)/parallax_error)*np.exp((-1./(2*(parallax_error)**2))*(parallax-(1./rmode))**2)
+    lo = brentq(lambda x: 2*np.log(x)-(x/L)-(((parallax-(1./x))**2)/(2*parallax_error**2)) \
+               +np.log(2)-np.log(M)-np.log(parallax_error), 0.001, rmode)
+    hi = brentq(lambda x: 2*np.log(x)-(x/L)-(((parallax-(1./x))**2)/(2*parallax_error**2)) \
+               +np.log(2)-np.log(M)-np.log(parallax_error), rmode, rmax)
+    fwhm = hi-lo
+    # Compute 1-sigma from FWHM:
+    sigma = fwhm/2.355
+            
+    return gd[0],sigma
+
+def to_polar(RAa,RAb,Deca,Decb):
+    ''' Converts RA/Dec [deg] of two binary components into separation and position angle of B relative 
+        to A [mas, deg]
+    '''
+    import numpy as np
+    import astropy.units as u
+    dRA = (RAb - RAa) * np.cos(np.radians(np.mean([Deca,Decb])))
+    dRA = (dRA*u.deg).to(u.mas)
+    dDec = (Decb - Deca)
+    dDec = (dDec*u.deg).to(u.mas)
+    r = np.sqrt( (dRA ** 2) + (dDec ** 2) )
+    p = (np.degrees( np.arctan2(dDec.value,-dRA.value) ) + 270.) % 360.
+    p = p*u.deg
+    return r, p
+
+def parallax(d):
+    """
+    Returns parallax in arcsec given distances.
+    Args:
+        d (float): distance
+    Return:
+        parallax in arcsecs
+    Written by: Logan Pearce, 2017
+    """
+    from astropy import units as u
+    d = d.to(u.pc)
+    x = (1*u.au)/(d)
+    return x.to(u.arcsec, equivalencies=u.dimensionless_angles())
+
+def physical_separation(d,theta):
+    """
+    Returns separation between two objects in the plane of the sky in AU given distance and parallax
+    Distance and parallax must be astropy unit objects.
+    Args:
+        d (float): distance
+        theta (float): parallax
+    Return:
+        separation in AU
+    Written by: Logan Pearce, 2017
+    """
+    from astropy import units as u
+    d = d.to(u.pc)
+    theta = theta.to(u.arcsec)
+    a = (d)*(theta)
+    return a.to(u.au, equivalencies=u.dimensionless_angles())
+
+def angular_separation(d,a):
+    """
+    Returns separation between two objects in the plane of the sky in AU given distance and parallax
+    Distance and parallax must be astropy unit objects.
+    Args:
+        d (float): distance
+        theta (float): parallax
+    Return:
+        separation in AU
+    Written by: Logan Pearce, 2017
+    """
+    from astropy import units as u
+    d = d.to(u.pc)
+    a = a.to(u.au)
+    theta = a / d
+    return theta.to(u.arcsec, equivalencies=u.dimensionless_angles())
+
 
 def draw_orbits(number):
-    ''' Draw a set of trial orbits as part of the OFTI procedure
+    ''' Semi-major axis is fixed at 100 au and long. of asc. node is fixed at 0 deg.
     Written by Logan Pearce, 2019
     '''
+    import astropy.units as u
+    import numpy as np
     sma = 100.*u.au
     sma = np.array(np.linspace(sma,sma,number))
     # Eccentricity:
@@ -21,7 +138,7 @@ def draw_orbits(number):
     # Argument of periastron in degrees:
     argp = np.random.uniform(0.0,360.0,number)
     # Long of nodes:
-    lon = np.radians(0.0)  
+    lon = np.degrees(0.0)
     lon = np.array([lon]*number)
     # orbit fraction (fraction of orbit completed at observation date since reference date)
     orbit_fraction = np.random.uniform(0.0,1.0,number)
@@ -29,6 +146,7 @@ def draw_orbits(number):
 
 def eccentricity_anomaly(E,e,M):
     '''Eccentric anomaly function'''
+    import numpy as np
     return E - (e*np.sin(E)) - M
 
 def solve(f, M0, e, h):
@@ -42,6 +160,7 @@ def solve(f, M0, e, h):
     Returns: nextE (float): converged solution for eccentric anomaly
         Written by Logan Pearce, 2019
     '''
+    import numpy as np
     if M0 / (1.-e) - np.sqrt( ( (6.*(1-e)) / e ) ) <= 0:
         E0 = M0 / (1.-e)
     else:
@@ -65,6 +184,7 @@ def rotate_z(vector,theta):
             theta [rad]: angle to rotate the vector about
         Returns: rotated vector
     """
+    
     R = np.array([[np.cos(theta), -np.sin(theta), 0],
                [np.sin(theta), np.cos(theta), 0],
                [0, 0, 1]
@@ -94,45 +214,19 @@ def rotate_x(vector,theta):
     out[2] = R[2,0]*vector[0,:] + R[2,1]*vector[1,:] + R[2,2]*vector[2,:]
     return out
 
-
-def rotate_z_matmul(vector,theta):
-    """ Rotate a 3D vector about the +z axis
-        Inputs:
-            vector: 3d vector array
-            theta [rad]: angle to rotate the vector about
-        Returns: rotated vector
-    """
-    Rz = np.array([[np.cos(theta), -np.sin(theta), 0],
-               [np.sin(theta), np.cos(theta), 0],
-               [0, 0, 1]
-              ])
-    return np.matmul(Rz,vector)
-
-def rotate_x_matmul(vector,theta):
-    """ Rotate a 3D vector about the +z axis
-        Inputs:
-            vector: 3d vector array
-            theta [rad]: angle to rotate the vector about
-        Returns: rotated vector
-    """
-    Rx = np.array([[1, 0, 0],
-               [0, np.cos(theta), -np.sin(theta)],
-               [0, np.sin(theta), np.cos(theta)],      
-              ])
-    return np.matmul(Rx,vector)
-
-
 def keplerian_to_cartesian(sma,ecc,inc,argp,lon,meananom,kep):
-    """ Given Keplerian elements, return the position and velocity of an orbiting body in
-        the plane of the sky.
+    """ Given a set of Keplerian orbital elements, returns the observable 3-dimensional position, velocity, 
+        and acceleration at the specified time.  Accepts and arbitrary number of input orbits.  Semi-major 
+        axis must be an astropy unit object in physical distance (ex: au, but not arcsec).  The observation
+        time must be converted into mean anomaly before passing into function.
         Inputs:
-            sma (flt) [au]: semi-major axis in au, must be an astropy units object
-            ecc (flt) [unitless]: eccentricity
-            inc (flt) [deg]: inclination
-            argp (flt) [deg]: argument of periastron
-            lon (flt) [deg]: longitude of ascending node
-            meananom (flt) [radians]: mean anomaly 
-            kep (flt): kepler constant = mu/m where mu = G*m1*m2 and m = [1/m1 + 1/m2]^-1 . 
+            sma (1xN arr flt) [au]: semi-major axis in au, must be an astropy units object
+            ecc (1xN arr flt) [unitless]: eccentricity
+            inc (1xN arr flt) [deg]: inclination
+            argp (1xN arr flt) [deg]: argument of periastron
+            lon (1xN arr flt) [deg]: longitude of ascending node
+            meananom (1xN arr flt) [radians]: mean anomaly 
+            kep (1xN arr flt): kepler constant = mu/m where mu = G*m1*m2 and m = [1/m1 + 1/m2]^-1 . 
                         In the limit of m1>>m2, mu = G*m1 and m = m2
         Returns:
             pos (3xN arr) [au]: position in xyz coords in au, with 
@@ -189,22 +283,24 @@ def keplerian_to_cartesian(sma,ecc,inc,argp,lon,meananom,kep):
     return np.transpose(pos)*u.au, np.transpose(vel)*(u.km/u.s), np.transpose(acc)*(u.km/u.s/u.yr)
 
 def cartesian_to_keplerian(pos, vel, kep):
-    """ Given observables XYZ position and velocity, compute orbital elements
+    """Given observables XYZ position and velocity, compute orbital elements.  Position must be in
+       au and velocity in km/s.  Returns astropy unit objects for all orbital elements.
         Inputs:
             pos (3xN arr) [au]: position in xyz coords in au, with 
                         x = pos[0], y = pos[1], z = pos[2] for each of N orbits
                         +x = +Dec, +y = +RA, +z = towards observer
             vel (3xN arr) [km/s]: velocity in xyz plane.
         Returns:
-            sma (flt) [au]: semi-major axis in au, must be an astropy units object
-            ecc (flt) [unitless]: eccentricity
-            inc (flt) [deg]: inclination
-            argp (flt) [deg]: argument of periastron
-            lon (flt) [deg]: longitude of ascending node
-            meananom (flt) [radians]: mean anomaly 
+            sma (1xN arr flt) [au]: semi-major axis in au, must be an astropy units object
+            ecc (1xN arr flt) [unitless]: eccentricity
+            inc (1xN arr flt) [deg]: inclination
+            argp (1xN arr flt) [deg]: argument of periastron
+            lon (1xN arr flt) [deg]: longitude of ascending node
+            meananom (1xN arr flt) [radians]: mean anomaly 
         Written by Logan Pearce, 2019, inspired by Sarah Blunt
     """
     import numpy as np
+    import astropy.units as u
     # rvector x vvector:
     rcrossv = np.cross(pos, vel)*u.au*(u.km/u.s)
     # specific angular momentum:

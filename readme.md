@@ -1,6 +1,8 @@
 # Functions for computing quantities in orbital dynamics.
 Written by Logan Pearce, 2019 (with inspiration from Sarah Blunt)
 
+Orbittools is a set of functions useful in working with 2-body problems and observations.  It's not not comprehensive nor particularly fancy, but it is useful.  Bascially I wanted a place to store and easily call functions I used all the time.  I'll update it sometimes.
+
 **period:** given semi-major axis in au and central object mass in solar masses, return the period in years using Kepler's 3rd law.  If astropy unit objects are passed, returns an astropy unit object, otherwise returns a float.
 
 **distance:** Computes distance from Gaia parallaxes using the Bayesian method of Bailer-Jones 2015.
