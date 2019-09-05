@@ -4,7 +4,7 @@ def readme():
     with open('README.rst') as f:
         return f.read()
 
-setup(name='myastrotools',
+setup(name='orbittools',
       version='0.1',
       description='basic python tools for working with orbital dynamics',
       url='https://github.com/logan-pearce/orbittools',
