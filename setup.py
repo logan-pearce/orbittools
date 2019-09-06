@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='orbittools',
-      version='0.2',
+      version='0.5',
       description='basic python tools for working with orbital dynamics',
       url='https://github.com/logan-pearce/orbittools',
       author='Logan Pearce',

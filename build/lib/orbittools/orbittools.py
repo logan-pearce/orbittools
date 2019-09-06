@@ -1,4 +1,4 @@
-def period(sma_au,mass):
+def period(sma,mass):
     """ Given semi-major axis in AU and mass in solar masses, return the period in years of an orbit using 
         Kepler's third law.
         Written by Logan Pearce, 2019
@@ -7,10 +7,12 @@ def period(sma_au,mass):
     import astropy.units as u
     # If astropy units are given, return astropy unit object
     try:
-        period = np.sqrt(((sma_au)**3)/mass).value*(u.yr)
+        sma = sma.to(u.au)
+        mass = mass.to(u.Msun)
+        period = np.sqrt(((sma)**3)/mass).value*(u.yr)
     # else return just a value.
     except:
-        period = np.sqrt(((sma_au)**3)/mass)
+        period = np.sqrt(((sma)**3)/mass)
     return period
 
 def distance(parallax,parallax_error):
@@ -184,16 +186,23 @@ def rotate_z(vector,theta):
             theta [rad]: angle to rotate the vector about
         Returns: rotated vector
     """
-    
+    import numpy as np
     R = np.array([[np.cos(theta), -np.sin(theta), 0],
                [np.sin(theta), np.cos(theta), 0],
                [0, 0, 1]
               ])
+    if np.ndim(vector) == 1:
+        out = np.zeros(3)
+        out[0] = R[0,0]*vector[0] + R[0,1]*vector[1] + R[0,2]*vector[2]
+        out[1] = R[1,0]*vector[0] + R[1,1]*vector[1] + R[1,2]*vector[2]
+        out[2] = R[2,0]*vector[0] + R[2,1]*vector[1] + R[2,2]*vector[2]
+        
+    else:
+        out = np.zeros((3,vector.shape[1]))
+        out[0] = R[0,0]*vector[0,:] + R[0,1]*vector[1,:] + R[0,2]*vector[2,:]
+        out[1] = R[1,0]*vector[0,:] + R[1,1]*vector[1,:] + R[1,2]*vector[2,:]
+        out[2] = R[2,0]*vector[0,:] + R[2,1]*vector[1,:] + R[2,2]*vector[2,:]
     
-    out = np.zeros((3,vector.shape[1]))
-    out[0] = R[0,0]*vector[0,:] + R[0,1]*vector[1,:] + R[0,2]*vector[2,:]
-    out[1] = R[1,0]*vector[0,:] + R[1,1]*vector[1,:] + R[1,2]*vector[2,:]
-    out[2] = R[2,0]*vector[0,:] + R[2,1]*vector[1,:] + R[2,2]*vector[2,:]
     return out
 
 def rotate_x(vector,theta):
@@ -203,15 +212,26 @@ def rotate_x(vector,theta):
             theta [rad]: angle to rotate the vector about
         Returns: rotated vector
     """
-    R = np.array([[[1.]*len(theta), 0., 0.],
+    import numpy as np
+    if np.ndim(vector) == 1:
+        R = np.array([[1., 0., 0.],
               [0., np.cos(theta), -np.sin(theta)],
               [0., np.sin(theta), np.cos(theta)]  
               ])
-    
-    out = np.zeros((3,vector.shape[1]))
-    out[0] = R[0,0]*vector[0,:] + R[0,1]*vector[1,:] + R[0,2]*vector[2,:]
-    out[1] = R[1,0]*vector[0,:] + R[1,1]*vector[1,:] + R[1,2]*vector[2,:]
-    out[2] = R[2,0]*vector[0,:] + R[2,1]*vector[1,:] + R[2,2]*vector[2,:]
+        out = np.zeros(3)
+        out[0] = R[0,0]*vector[0] + R[0,1]*vector[1] + R[0,2]*vector[2]
+        out[1] = R[1,0]*vector[0] + R[1,1]*vector[1] + R[1,2]*vector[2]
+        out[2] = R[2,0]*vector[0] + R[2,1]*vector[1] + R[2,2]*vector[2]
+        
+    else:
+        R = np.array([[[1.]*len(theta), 0., 0.],
+              [0., np.cos(theta), -np.sin(theta)],
+              [0., np.sin(theta), np.cos(theta)]  
+              ])
+        out = np.zeros((3,vector.shape[1]))
+        out[0] = R[0,0]*vector[0,:] + R[0,1]*vector[1,:] + R[0,2]*vector[2,:]
+        out[1] = R[1,0]*vector[0,:] + R[1,1]*vector[1,:] + R[1,2]*vector[2,:]
+        out[2] = R[2,0]*vector[0,:] + R[2,1]*vector[1,:] + R[2,2]*vector[2,:]
     return out
 
 def keplerian_to_cartesian(sma,ecc,inc,argp,lon,meananom,kep):
@@ -241,38 +261,57 @@ def keplerian_to_cartesian(sma,ecc,inc,argp,lon,meananom,kep):
     
     # Compute mean motion and eccentric anomaly:
     meanmotion = np.sqrt(kep / sma**3).to(1/u.s)
-    nextE = [solve(eccentricity_anomaly, varM,vare, 0.001) for varM,vare in zip(meananom, ecc)]
-    E = np.array(nextE)
-    #E = solve(eccentricity_anomaly, meananom, ecc, 0.001)
+    try:
+        E = solve(eccentricity_anomaly, meananom, ecc, 0.001)
+    except:
+        nextE = [solve(eccentricity_anomaly, varM,vare, 0.001) for varM,vare in zip(meananom, ecc)]
+        E = np.array(nextE)
 
     # Compute position:
-    pos = np.zeros((3,len(sma)))
+    try:
+        pos = np.zeros((3,len(sma)))
     # In the plane of the orbit:
-    pos[0,:], pos[1,:] = (sma*(np.cos(E) - ecc)).value, (sma*np.sqrt(1-ecc**2)*np.sin(E)).value
+        pos[0,:], pos[1,:] = (sma*(np.cos(E) - ecc)).value, (sma*np.sqrt(1-ecc**2)*np.sin(E)).value
+    except:
+        pos = np.zeros(3)
+        pos[0], pos[1] = (sma*(np.cos(E) - ecc)).value, (sma*np.sqrt(1-ecc**2)*np.sin(E)).value
+        
     # Rotate to plane of the sky:
     pos = rotate_z(pos, np.radians(argp))
     pos = rotate_x(pos, np.radians(inc))
     pos = rotate_z(pos, np.radians(lon))
     
     # compute velocity:
-    vel = np.zeros((3,len(sma)))
-    vel[0], vel[1] = (( -meanmotion * sma * np.sin(E) ) / ( 1- ecc * np.cos(E) )).to(u.km/u.s).value, \
+    try:
+        vel = np.zeros((3,len(sma)))
+        vel[0], vel[1] = (( -meanmotion * sma * np.sin(E) ) / ( 1- ecc * np.cos(E) )).to(u.km/u.s).value, \
+                (( meanmotion * sma * np.sqrt(1 - ecc**2) *np.cos(E) ) / ( 1 - ecc * np.cos(E) )).to(u.km/u.s).value
+    except:
+        vel = np.zeros(3)
+        vel[0], vel[1] = (( -meanmotion * sma * np.sin(E) ) / ( 1- ecc * np.cos(E) )).to(u.km/u.s).value, \
                 (( meanmotion * sma * np.sqrt(1 - ecc**2) *np.cos(E) ) / ( 1 - ecc * np.cos(E) )).to(u.km/u.s).value
     vel = rotate_z(vel, np.radians(argp))
     vel = rotate_x(vel, np.radians(inc))
     vel = rotate_z(vel, np.radians(lon))
     
     # Compute accelerations numerically
-    acc = np.zeros((3,len(sma)))
     # Generate a nearby future time point(s) along the orbit:
     deltat = 0.002*u.yr
+    try:
+        acc = np.zeros((3,len(sma)))
+        futurevel = np.zeros((3,len(sma)))
+    except:
+        acc = np.zeros(3)
+        futurevel = np.zeros(3)
     # Compute new mean anomaly at future time:
     futuremeananom = meananom + meanmotion*((deltat).to(u.s))
     # Compute new eccentricity anomaly at future time:
-    futureE = [solve(eccentricity_anomaly, varM,vare, 0.001) for varM,vare in zip(futuremeananom.value, ecc)]
-    futureE = np.array(futureE)
+    try:
+        futureE = [solve(eccentricity_anomaly, varM,vare, 0.001) for varM,vare in zip(futuremeananom.value, ecc)]
+        futureE = np.array(futureE)
+    except:
+        futureE = solve(eccentricity_anomaly, futuremeananom.value, ecc, 0.001)
     # Compute new velocity at future time:
-    futurevel = np.zeros((3,len(sma)))
     futurevel[0], futurevel[1] = (( -meanmotion * sma * np.sin(futureE) ) / ( 1- ecc * np.cos(futureE) )).to(u.km/u.s).value, \
                 (( meanmotion * sma * np.sqrt(1 - ecc**2) *np.cos(futureE) ) / ( 1 - ecc * np.cos(futureE) )).to(u.km/u.s).value
     futurevel = rotate_z(futurevel, np.radians(argp))
