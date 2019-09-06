@@ -21,7 +21,6 @@ Orbittools is a set of functions useful in working with 2-body problems and obse
 **angular_separation:** Given physical separation and distance, return the angular on-sky separation.  Distance and physical separation must be astropy unit open.
 
 **keplerian_to_cartesian:** Given a set of Keplerian orbital elements, returns the observable 3-dimensional position, velocity, and acceleration at the specified time.  Accepts and arbitrary number of input orbits.  Semi-major axis must be an astropy unit object in physical distance (ex: au, but not arcsec).  The observation time must be converted into mean anomaly before passing into function.
-
 	Inputs:
             sma (1xN arr flt) [au]: semi-major axis in au, must be an astropy units object
             ecc (1xN arr flt) [unitless]: eccentricity
@@ -40,7 +39,6 @@ Orbittools is a set of functions useful in working with 2-body problems and obse
 
 **cartesian_to_keplerian:** Given observables XYZ position and velocity, compute orbital elements.  Position must be in
 au and velocity in km/s.  Returns astropy unit objects for all orbital elements.
-
         Inputs:
             pos (3xN arr) [au]: position in xyz coords in au, with 
                         x = pos[0], y = pos[1], z = pos[2] for each of N orbits
@@ -54,3 +52,9 @@ au and velocity in km/s.  Returns astropy unit objects for all orbital elements.
             lon (1xN arr flt) [deg]: longitude of ascending node
             meananom (1xN arr flt) [radians]: mean anomaly 
 
+# Installation:
+To install these functions, use pip:
+
+	pip install orbittools
+
+Requires numpy, astropy, and python 3
