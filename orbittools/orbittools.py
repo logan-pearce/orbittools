@@ -15,6 +15,23 @@ def period(sma,mass):
         period = np.sqrt(((sma)**3)/mass)
     return period
 
+def semimajoraxis(period,mass):
+    """ Given period in years and mass in solar masses, return the semi-major axis in au of an orbit using 
+        Kepler's third law.
+        Written by Logan Pearce, 2019
+    """
+    import numpy as np
+    import astropy.units as u
+    # If astropy units are given, return astropy unit object
+    try:
+        period = period.to(u.yr)
+        mass = mass.to(u.Msun)
+        sma = ((mass * period**2) ** (1/3)).value*u.au
+    # else return just a value.
+    except:
+        sma = (mass * period**2) ** (1/3)
+    return sma
+
 def distance(parallax,parallax_error):
     '''Computes distance from Gaia parallaxes using the Bayesian method of Bailer-Jones 2015.
     Input: parallax [mas], parallax error [mas]
@@ -121,6 +138,21 @@ def angular_separation(d,a):
     a = a.to(u.au)
     theta = a / d
     return theta.to(u.arcsec, equivalencies=u.dimensionless_angles())
+
+def keplersconstant(m1,m2):
+    '''Compute Kepler's constant for two gravitationally bound masses
+        Inputs:
+            m1,m2 (arr,flt): masses of the two objects in solar masses.  Must be astropy objects
+        Returns:
+            Kepler's constant in m^3 s^(-2)
+    '''
+    import astropy.constants as c
+    m1 = m1.to(u.Msun)
+    m2 = m2.to(u.Msun)
+    mu = c.G*m1*m2
+    m = (1/m1 + 1/m2)**(-1)
+    kep = mu/m
+    return kep.to((u.m**3)/(u.s**2))
 
 
 def draw_orbits(number):
