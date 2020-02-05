@@ -1,3 +1,6 @@
+import numpy as np
+import astropy.units as u
+
 def period(sma,mass):
     """ Given semi-major axis in AU and mass in solar masses, return the period in years of an orbit using 
         Kepler's third law.
@@ -140,13 +143,14 @@ def angular_separation(d,a):
     return theta.to(u.arcsec, equivalencies=u.dimensionless_angles())
 
 def keplersconstant(m1,m2):
-    '''Compute Kepler's constant for two gravitationally bound masses
+    '''Compute Kepler's constant for two gravitationally bound masses k = G*m1*m2/(m1+m2) = G + (m1+m2)
         Inputs:
             m1,m2 (arr,flt): masses of the two objects in solar masses.  Must be astropy objects
         Returns:
             Kepler's constant in m^3 s^(-2)
     '''
     import astropy.constants as c
+    import astropy.units as u
     m1 = m1.to(u.Msun)
     m2 = m2.to(u.Msun)
     mu = c.G*m1*m2
@@ -195,6 +199,7 @@ def solve(f, M0, e, h):
         Written by Logan Pearce, 2019
     '''
     import numpy as np
+    from orbittools.orbittools import eccentricity_anomaly
     if M0 / (1.-e) - np.sqrt( ( (6.*(1-e)) / e ) ) <= 0:
         E0 = M0 / (1.-e)
     else:
@@ -206,6 +211,41 @@ def solve(f, M0, e, h):
         new = f(nextE,e,M0) 
         lastE = nextE
         nextE = lastE - new / (1.-e*np.cos(lastE)) 
+        number=number+1
+        if number >= 1000:
+            nextE = float('NaN')
+    return nextE
+
+def danby_solve(M0, e, h):
+    ''' Newton-Raphson solver for eccentricity anomaly based on "Danby" method in 
+        Wisdom textbook
+    Inputs: 
+        f (function): function to solve (transcendental ecc. anomaly function)
+        M0 (float): mean anomaly
+        e (float): eccentricity
+        h (float): termination criteria for solver
+    Returns: nextE (float): converged solution for eccentric anomaly
+        Written by Logan Pearce, 2020
+    '''
+    import numpy as np
+    from orbittools.orbittools import eccentricity_anomaly
+    f = eccentricity_anomaly
+    k = 0.85
+    E0 = M0 + np.sign(np.sin(M0))*k*e
+    lastE = E0
+    nextE = lastE + 10* h 
+    number=0
+    delta_D = 1
+    while (delta_D > h) and number < 1001: 
+        fx = f(nextE,e,M0) 
+        fp = (1.-e*np.cos(lastE)) 
+        fpp = e*np.sin(lastE)
+        fppp = e*np.cos(lastE)
+        lastE = nextE
+        delta_N = -fx / fp
+        delta_H = -fx / (fp + 0.5*fpp*delta_N)
+        delta_D = -fx / (fp + 0.5*fpp*delta_H + (1./6)*fppp*delta_H**2)
+        nextE = lastE + delta_D
         number=number+1
         if number >= 1000:
             nextE = float('NaN')
@@ -411,4 +451,80 @@ def cartesian_to_keplerian(pos, vel, kep):
     argp = uangle.value - f
     
     return sma.to(u.au), ecc, np.degrees(inc), (np.degrees(argp)%360.)*u.deg, (np.degrees(lon.value)%360.)*u.deg, M
+
+
+def kepler_advancer(ro, vo, t, k, to = 0):
+    ''' Initial value problem solver.  Given an initial position and
+        velocity vector (in 2 or 3 dimensions; in any reference frame
+        [plane of the sky, plane of the orbit]) at an initial time to,
+        compute the position and velocity vector at a later time t in 
+        that same frame.
+
+        Written by Logan A. Pearce, 2020
+        
+        Parameters:
+       -----------
+       ro : flt, arr
+           initial position vector at time = to; astropy unit object
+       vo : flt, arr
+           initial velocity vector at time = to; astropy unit object
+       t : flt
+           future time at which to compute new r,v vectors; 
+           astropy unit object
+       k : flt
+           "Kepler's constant", k = G*(m1+m2); astropy unit object
+       to : flt
+           initial time for initial values.  Default = 0; 
+           astropy unit object
+       
+       Returns:
+       --------
+       new_r : flt, arr
+           new position vector at time t in m
+       new_v : flt, arr
+           new velocity vector at time t in m/s
+    '''
+    from orbittools.orbittools import danby_solve
+    import numpy as np
+    # Convert everything to mks:
+    ro = ro.to(u.m).value
+    vo = vo.to(u.m/u.s).value
+    k = k.to((u.m**3)/(u.s**2)).value
+    t = t.to(u.s).value
+    if to != 0:
+        to = to.to(u.s).value
+    # Compute magnitude of position vector:
+    r = np.linalg.norm(ro)
+    # Compute v^2:
+    v2 = np.linalg.norm(vo)**2
+    # Compute ang mom h^2:
+    h2 = np.linalg.norm(np.cross(ro,vo))**2
+    # find a [m] from vis-viva:
+    a = (2/r - v2/k)**(-1)
+    # mean motion:
+    n = np.sqrt(k/(a**3))
+    # ecc:
+    e = np.sqrt( 1 - h2/(k*a) )
+    # Eo:
+    E0 = np.arccos(1/e*(1-r/a))
+    # M0:
+    M0 = E0 - e*np.sin(E0)
+    # M(t = t):
+    M = M0 + n*(t-to)
+    # E:
+    E = danby_solve(M, e, 0.0001)
+    # f, g:
+    f = 1 + (a/r)*(np.cos(E-E0) - 1)
+    g = t - to + (1/n)*(np.sin(E-E0) - (E-E0))
+    # new r:
+    new_r = f*ro + g*vo
+    mag_new_r = np.linalg.norm(new_r)
+    # fdot, gdot:
+    fdot = (-n*(a**2)/(r*mag_new_r)) * np.sin(E-E0)
+    gdot = 1 + (a/(mag_new_r)) * (np.cos(E - E0) - 1)
+    # new v:
+    new_v = fdot*ro + gdot*vo
+    
+    return new_r*u.m, new_v*(u.m/u.s)
+
 

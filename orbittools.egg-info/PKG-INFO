@@ -1,10 +1,10 @@
 Metadata-Version: 1.0
 Name: orbittools
-Version: 0.5
+Version: 0.6
 Summary: basic python tools for working with orbital dynamics
 Home-page: https://github.com/logan-pearce/orbittools
 Author: Logan Pearce
 Author-email: loganpearce55@gmail.com
-License: UNKNOWN
+License: MIT
 Description: UNKNOWN
 Platform: UNKNOWN

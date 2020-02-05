@@ -30,40 +30,6 @@ def solve(f, M0, e, h):
             nextE = float('NaN')#This truncates the calculation if a solution hasn't been reached by 1000 iter.
     return nextE
 
-def danby_solve(f, M0, e, h):
-    ''' Newton-Raphson solver for eccentricity anomaly based on "Danby" method in 
-        Wisdom textbook
-    Inputs: 
-        f (function): function to solve (transcendental ecc. anomaly function)
-        M0 (float): mean anomaly
-        e (float): eccentricity
-        h (float): termination criteria for solver
-    Returns: nextE (float): converged solution for eccentric anomaly
-        Written by Logan Pearce, 2020
-    '''
-    import numpy as np
-    k = 0.85
-    E0 = M0 + np.sign(np.sin(M0))*k*e
-    lastE = E0
-    nextE = lastE + 10* h 
-    number=0
-    delta_D = 1
-    while (delta_D > h) and number < 1001: 
-        fx = f(nextE,e,M0) 
-        fp = (1.-e*np.cos(lastE)) 
-        fpp = e*np.sin(lastE)
-        fppp = e*np.cos(lastE)
-        lastE = nextE
-        delta_N = -fx / fp
-        delta_H = -fx / (fp + 0.5*fpp*delta_N)
-        delta_D = -fx / (fp + 0.5*fpp*delta_H + (1./6)*fppp*delta_H**2)
-        nextE = lastE + delta_D
-        number=number+1
-        if number >= 1000:
-            nextE = float('NaN')
-    print(number, nextE)
-    return nextE
-
 def to_si(mas,mas_yr,d):
     '''Convert from mas -> km and mas/yr -> km/s
         Input: 
@@ -207,7 +173,7 @@ def calc_velocities(a,T,to,e,i,w,O,date,dist):
         set of orbital elements at a single observation point.  Uses my eqns derived from Seager 
         Exoplanets Ch2.
         Inputs:
-            a [as]: semi-major axis in as
+            a [as]: semi-major axis in mas
             T [yrs]: period
             to [yrs]: epoch of periastron passage (in same time structure as dates)
             e: eccentricity

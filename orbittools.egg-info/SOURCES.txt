@@ -1,5 +1,6 @@
 setup.py
 orbittools/__init__.py
+orbittools/lofti.py
 orbittools/orbittools.py
 orbittools.egg-info/PKG-INFO
 orbittools.egg-info/SOURCES.txt
