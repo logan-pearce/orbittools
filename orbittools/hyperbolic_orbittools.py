@@ -1,10 +1,14 @@
+import astropy.units as u
+import astropy.constants as c
+import numpy as np
+
 def hyperbolic_anomaly(H,e,M):
     '''Eccentric anomaly function'''
     import numpy as np
     return H - (e*np.sin(H)) - M
 
 def hyperbolic_solve(f, M0, e, h):
-    ''' Newton-Raphson solver for eccentricity anomaly
+    ''' Newton-Raphson solver for hyperbolic anomaly
     from https://stackoverflow.com/questions/20659456/python-implementing-a-numerical-equation-solver-newton-raphson
     Inputs: 
         f (function): function to solve (transcendental ecc. anomaly function)
@@ -33,6 +37,9 @@ def sma(vinf,M):
         hyperbolic orbit around object of mass M.  vinf and M must
         be astropy unit objects
     """
+    import astropy.units as u
+    import astropy.constants as c
+    import numpy as np
     vinf = vinf.to(u.m/u.s)
     mu = c.G*(M.to(u.kg))
     return -mu/(vinf**2)
@@ -42,7 +49,10 @@ def ecc(vinf,M,R):
         hyperbolic orbit around object of mass M to periastron distance R.  
         vinf, R and M must be astropy unit objects
     """
-    a = sma(vinf,M,R)
+    import astropy.units as u
+    import astropy.constants as c
+    import numpy as np
+    a = sma(vinf,M)
     e = 1 - R/a
     return e
 
@@ -51,6 +61,9 @@ def compute_psi(vinf,M,R):
         hyperbolic orbit around object of mass M to periastron distance R.  
         vinf, R and M must be astropy unit objects.
     """
+    import astropy.units as u
+    import astropy.constants as c
+    import numpy as np
     e = ecc(vinf,M,R)
     psi = 2*np.arcsin(1/e)
     return psi
@@ -60,6 +73,9 @@ def impact_parameter(vinf,M,R):
         hyperbolic orbit around object of mass M to periastron distance R.  
         vinf, R and M must be astropy unit objects.
     """
-    a = sma(vinf,M,R)
+    import astropy.units as u
+    import astropy.constants as c
+    import numpy as np
+    a = sma(vinf,M)
     e = ecc(vinf,M,R)
     return -a*np.sqrt(e**2-1)

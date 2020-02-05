@@ -61,7 +61,6 @@ def danby_solve(f, M0, e, h):
         number=number+1
         if number >= 1000:
             nextE = float('NaN')
-    print(number, nextE)
     return nextE
 
 def to_si(mas,mas_yr,d):
