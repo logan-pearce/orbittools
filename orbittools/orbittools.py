@@ -127,13 +127,14 @@ def physical_separation(d,theta):
 
 def angular_separation(d,a):
     """
-    Returns separation between two objects in the plane of the sky in AU given distance and parallax
-    Distance and parallax must be astropy unit objects.
+    Returns separation between two objects in the plane of the sky in angle given distance and 
+    physical separation in AU.
+    Distance and separation must be astropy unit objects.
     Args:
         d (float): distance
-        theta (float): parallax
+        a (float): separation
     Return:
-        separation in AU
+        theta in arcsec
     Written by: Logan Pearce, 2017
     """
     from astropy import units as u
