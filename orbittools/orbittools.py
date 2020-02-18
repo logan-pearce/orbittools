@@ -252,6 +252,10 @@ def danby_solve(M0, e, h):
             nextE = float('NaN')
     return nextE
 
+###################################################################
+# a set of functions for working with position, velocity, acceleration,
+# and orbital elements for Keplerian orbits.
+
 def rotate_z(vector,theta):
     """ Rotate a 3D vector about the +z axis
         Inputs:
@@ -527,5 +531,73 @@ def kepler_advancer(ro, vo, t, k, to = 0):
     new_v = fdot*ro + gdot*vo
     
     return new_r*u.m, new_v*(u.m/u.s)
+
+
+
+################################################################
+# a set of functions for estimating how much of an orbit you
+# need to observe to get a good handle on the orbit's velocity,
+# acceleration, and 3rd derivative.
+
+def orbit_fraction(sep, seperr, snr = 5):
+    """ What fraction of an orbital period do you need to observe to characterize
+        the velocity, acceleration, and 3rd derivatives to a given SNR?  That
+        is, v/sigma_v = 5, etc.  This is a rough estimate derived from assuming 
+        a circular face-on orbit.
+        Inputs:
+            sep, seperr : observed separation and error in separation, any unit
+            snr : desired signal to noise ratio.  Default = 5
+        Returns:
+            of_for_vel, of_for_acc, of_for_jerk : orbit fraction required to be 
+                observed to achieve desired snr for understanding the 
+                velocity, acceleration, and jerk. In decimal fraction, 
+                ex: 0.01 = 1% of orbit
+    """
+    of_for_vel = (snr/5)*seperr/sep
+    of_for_acc = (snr/5)*np.sqrt((9*seperr)/(5*sep))
+    of_for_jerk = (snr/5)*(seperr/sep)**(1/3)
+    return of_for_vel, of_for_acc, of_for_jerk
+
+
+def orbit_fraction_observing_time(sep, seperr, period, snr = 5):
+    """ Given a fractional postional uncertainty and a given orbital 
+        period, what timespace do your observations need to cover to 
+        achieve a desired SNR on velocity, acceleration, and jerk?
+        Inputs:
+            sep, seperr : observed separation and error in separation, any unit
+            snr : desired signal to noise ratio.  Default = 5
+            period : orbital period in years
+        Returns:
+            time needed to observe vel, acc, jerk to desired SNR in years.
+    """
+    from orbittools.orbittools import orbit_fraction
+    v,a,j = orbit_fraction(sep, seperr, snr=snr)
+    return v*period,a*period,j*period
+
+def orbit_fraction_postional_uncertainty(time, period, sep = None, snr = 5):
+    """ Given a certain observing timespan, what measurement precision
+        is needed to obtain the desired SNR on vel, acc, and jerk?
+        The orbit fraction is the ratio of observed time span to the period,
+        and is also defined by the scale-free positional uncertainty given
+        in the orbit_fraction() function.
+        Inputs:
+            time : observed time span in years
+            period : orbital period in years
+            sep : separation (optional)
+            snr : desired signal-to-noise on measurements.  Currently set at 5.
+        Returns:
+            if separation is given, returns the required astrometric precision for
+                snr = 5 for vel, acc, jerk in same units as sep input.
+            if no separation if given, the scale-free positional uncertainty is 
+                returned.
+    """
+    of = time/period
+    v_scalefree_uncert = of
+    a_scalefree_uncert = (of**2)*(5/9)
+    j_scalefree_uncert = of**3
+    if sep:
+        return v_scalefree_uncert*sep, a_scalefree_uncert*sep, j_scalefree_uncert*sep
+    else:
+        return v_scalefree_uncert, a_scalefree_uncert, j_scalefree_uncert
 
 
