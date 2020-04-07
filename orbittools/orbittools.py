@@ -94,6 +94,23 @@ def to_polar(RAa,RAb,Deca,Decb):
     p = p*u.deg
     return r, p
 
+def to_si(mas,mas_yr,d):
+    '''Convert from mas -> km and mas/yr -> km/s
+        Input: 
+         mas (array) [mas]: distance in mas
+         mas_yr (array) [mas/yr]: velocity in mas/yr
+         d (float) [pc]: distance to system in parsecs
+        Returns:
+         km (array) [km]: distance in km
+         km_s (array) [km/s]: velocity in km/s
+    '''
+    import numpy as np
+    import astropy.units as u
+    km = ((mas*u.mas.to(u.arcsec)*d)*u.AU).to(u.km)
+    km_s = ((mas_yr*u.mas.to(u.arcsec)*d)*u.AU).to(u.km)
+    km_s = (km_s.value)*(u.km/u.yr).to(u.km/u.s)
+    return km.value,km_s
+
 def parallax(d):
     """
     Returns parallax in arcsec given distances.
@@ -479,6 +496,46 @@ def calc_accel(a,T,to,e,i,w,O,date,dist, solvefunc = solve):
     Zddot = sin(i)*((rddot - r*(fdot**2))*sin(w+f) + ((2*rdot*fdot + r*fddot)*cos(w+f)))
     return Xddot*(u.km/u.yr/u.yr).to((u.m/u.s/u.yr)), Yddot*(u.km/u.yr/u.yr).to((u.m/u.s/u.yr)), \
                     Zddot*(u.km/u.yr/u.yr).to((u.m/u.s/u.yr))
+
+###################################################################
+# OFTI specific functions:
+
+def scale_and_rotate(X,Y):
+    ''' Generates a new semi-major axis, period, epoch of peri passage, and long of peri for each orbit
+        given the X,Y plane of the sky coordinates for the orbit at the date of the reference epoch
+    '''
+    import numpy as np
+    r_model = np.sqrt((X**2)+(Y**2))
+    rho_rand = np.random.normal(rho/1000.,rhoerr/1000.) #This generates a gaussian random to 
+    #scale to that takes observational uncertainty into account.  #convert to arcsec
+    #rho_rand = rho/1000. 
+    a2 = a*(rho_rand/r_model)  #<- scaling the semi-major axis
+    #New period:
+    a2_au=a2*dist #convert to AU for period calc:
+    T2 = np.sqrt((np.absolute(a2_au)**3)/np.absolute(m1))
+    #New epoch of periastron passage
+    to2 = d-(const*T2)
+
+    # Rotate:
+    # Rotate PA:
+    PA_model = (np.degrees(np.arctan2(X,-Y))+270)%360 #corrects for difference in zero-point
+    #between arctan function and ra/dec projection
+    PA_rand = np.random.normal(pa,paerr) #Generates a random PA within 1 sigma of observation
+    #PA_rand = pa
+    #New omega value:
+    O2=[]
+    for PA_i in PA_model:
+        if PA_i < 0:
+            O2.append((PA_rand-PA_i) + 360.)
+        else:
+            O2.append(PA_rand-PA_i)
+    # ^ This step corrects for the fact that the arctan gives the angle from the +x axis being zero,
+    #while for RA/Dec the zero angle is +y axis.  
+
+    #Recompute model with new rotation:
+    O2 = np.array(O2)
+    O2 = np.radians(O2)
+    return a2,T2,to2,O2
 
 def calc_OFTI(a,T,const,to,e,i,w,O,d,m1,dist,rho,pa, solvefunc = solve):
     '''Perform OFTI steps to determine position/velocity/acceleration predictions given
