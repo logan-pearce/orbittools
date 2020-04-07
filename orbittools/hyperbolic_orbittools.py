@@ -28,7 +28,7 @@ def hyperbolic_solve(f, M0, e, h):
         lastH = nextH
         nextH = lastH - new / (1.-e*np.cos(lastH)) 
         number=number+1
-        if number >= 1000:
+        if number >= 100:
             nextH = float('NaN')
     return nextH
 
