@@ -1,5 +1,12 @@
 import numpy as np
 import astropy.units as u
+import astropy.constants as c
+
+def ComputeChi2(array, measurements):
+    chi = 0
+    for i in range(len(array)):
+        chi += ( (array[i][0] - measurements[i]) / array[i][1] ) ** 2
+    return chi
 
 def period(sma,mass):
     """ Given semi-major axis in AU and mass in solar masses, return the period in years of an orbit using 
@@ -160,6 +167,44 @@ def angular_separation(d,a):
     theta = a / d
     return theta.to(u.arcsec, equivalencies=u.dimensionless_angles())
 
+def circular_velocity(au,m):
+    """ Given separation in AU and total system mass, return the velocity of a test particle on a circular orbit
+        around a central body at that mass """
+    import astropy.constants as c
+    import astropy.units as u
+    import numpy as np
+    m = m*u.Msun
+    au = au*u.AU
+    v = np.sqrt( c.G * m.to(u.kg) / (au.to(u.m)) )
+    return v.to(u.km/u.s)
+
+def v_escape(r,M):
+    ''' Compute the escape velocity of an object of mass M at distance r.  M and r should be
+        astropy unit objects
+    '''
+    try:
+        r = r.to(u.au)
+        M = M.to(u.Msun)
+    except:
+        r = r*u.au
+        M = M*u.Msun
+    return (np.sqrt(2*c.G*(M) / (r))).decompose()
+    
+
+def parallax_to_circularvel(plx,mass,theta):
+    """ Given a parallax value+error, total system mass, and separation, compute the circular velocity
+        for a test particle on a circular orbit at that separation.  Plx should be a tuple of
+        (plx value, error) in mas.  Theta should be an astropy units object, either arcsec or mas, mass
+        in solar masses.  Returns circular vel in km/s
+    """
+    from myastrotools.astrometry import circular_velocity, physical_separation
+    from myastrotools.gaia_tools import distance
+    import astropy.units as u
+    dist = distance(*plx)[0]*u.pc
+    sep = physical_separation(dist,theta)
+    cv = circular_velocity(sep.value,mass)
+    return cv
+
 def tisserand(a,e,i):
     """ Return Tisserand parameter for given orbital parameters relative to
            Jupiter
@@ -268,7 +313,7 @@ def solve(f, M0, e, h):
             nextE = float('NaN')
     return nextE
 
-def danby_solve(M0, e, h, maxnum=50):
+def danby_solve(f, M0, e, h, maxnum=50):
     ''' Newton-Raphson solver for eccentricity anomaly based on "Danby" method in 
         Wisdom textbook
     Inputs: 
@@ -283,7 +328,7 @@ def danby_solve(M0, e, h, maxnum=50):
     '''
     import numpy as np
     from orbittools.orbittools import eccentricity_anomaly
-    f = eccentricity_anomaly
+    #f = eccentricity_anomaly
     k = 0.85
     E0 = M0 + np.sign(np.sin(M0))*k*e
     lastE = E0
